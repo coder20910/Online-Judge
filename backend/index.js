@@ -1,6 +1,9 @@
 const express = require('express');
 const {DBConnection} = require('./database/db');
-const {User} = require('./models/User');
+const User = require('./models/User');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
 DBConnection();
 // server creation 
@@ -10,9 +13,9 @@ app.use(express.json());
 app.use(express.urlencoded({extended : true}));
 
 // endpoint handlers 
-// 1. route, handler function (req, resp) 
-app.get('/', (req, resp)=>{
-    resp.send('Hello there we are here');
+// route, handler function (req, resp) 
+app.get('/', (req, resp) => {
+    resp.send('Hello there!');
 });
 
 // register handlder
@@ -20,45 +23,59 @@ app.post('/register', async (req, resp) => {
 
     // default response and status code
     let statusCode = 400;
-    let responseMessage = '';
+    let responseData = '';
 
     // check if all required datas are incoming from rquest (validation)
     let requiredKeys = ['firstname', 'lastname', 'password', 'email'];
     let missingKeys = []; 
     for(let i = 0; i < requiredKeys.length; i++){
-        // console.log(requiredKeys[i]);
-        // console.log(req.body.requiredKeys[i]);
-        // let passedValue = req.body?.requiredKeys[i];
         if(!req.body.hasOwnProperty(requiredKeys[i])){
             missingKeys.push(requiredKeys[[i]]);
         };
     };
 
     if (missingKeys.length != 0){
-        responseMessage = `Please enter all the required keys. Missing keys : ${missingKeys.join(', ')}`;
+        responseData = {'status': 'failed', 'message' : `Please enter all the required keys. Missing keys : ${missingKeys.join(', ')}`};
     }
     else{
         // get all the data from frontend
         const {firstname, lastname, password, email} = req.body;
-        console.log(firstname);
-        // check if user already exists 
 
-        const isUserExists = await User.findOne({email});
+        // check if user already exists 
+        const isUserExists = await User.findOne({email : email});
         if (isUserExists){
-            statusCode = 200;
-            responseMessage = 'User already exists. Please use credetials to login.'
+            statusCode = 200;  
+            responseData = {'status': 'failed', 'message' : `User already exists for email : ${email}.`};
         }
         else{
+            // encrypt the user password
             statusCode = 200;
-            responseMessage = 'Encrypt the use password';
-            // encrypt the user password 
+            const hashedPassword = await bcrypt.hash(password, 10);
+            responseData = 'Encrypt the use password' + hashedPassword;
 
+            // save data into database
+            const userData = await User.create({
+                firstname, 
+                lastname, 
+                email, 
+                password : hashedPassword
+            });
+
+            // generate a token for user and send it
+            const token = jwt.sign({id: userData._id, email}, process.env.SECRET_KEY, {
+                expiresIn: '1h'
+            });
+            userData.password = undefined;
+            userData.token = token;
+            
+            responseData = {
+                'message': 'User successfully created.',
+                userData
+            };
         }
     }
-    // save data into database 
-    // generate a token for user and send it
 
-    resp.status(statusCode).send(responseMessage);
+    resp.status(statusCode).send(responseData);
 });
 
 
