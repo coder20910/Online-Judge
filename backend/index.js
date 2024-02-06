@@ -4,6 +4,7 @@ const User = require('./models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const cookies = require('cookie-parser');
 
 DBConnection();
 // server creation 
@@ -78,6 +79,70 @@ app.post('/register', async (req, resp) => {
     resp.status(statusCode).send(responseData);
 });
 
+app.post('/login', async(req, resp) => {
+    // default response and status code
+    let statusCode = 400;
+    let responseData = {'status':'ok', 'message': ''};
+    try{
+        // check if all required datas are incoming from rquest (validation)
+        let requiredKeys = ['password', 'email'];
+        let missingKeys = []; 
+        for(let i = 0; i < requiredKeys.length; i++){
+            if(!req.body.hasOwnProperty(requiredKeys[i])){
+                missingKeys.push(requiredKeys[[i]]);
+            };
+        };
+        
+        if (missingKeys.length != 0){
+            statusCode = 400;
+            responseData = {'status': 'failed', 'message' : `Please enter all the required keys. Missing keys : ${missingKeys.join(', ')}`};
+        }
+        else{
+            // get user data
+            const {password, email} = req.body;
+            
+            // check if user exists in databasee
+            const user = await User.findOne({email : email});
+            if (!user){
+                statusCode = 200;  
+                responseData = {'status': 'failed', 'message' : `User does not exist for email : ${email}. Please register.`};
+            }
+            else{
+                // match password
+                const checkPasswordMatch = await bcrypt.compare(password, user.password);
+                if (!checkPasswordMatch){
+                    statusCode = 401;
+                    responseData = {'status': 'failed', 'message' : `incorrect password`};
+                }else{
+                    // generate a token for user and send it
+                    const token = jwt.sign({id: user._id, email}, process.env.SECRET_KEY, {
+                        expiresIn: '1h'
+                    });
+                    user.password = undefined;
+                    user.token = token;
+
+                    //store the cookies in browser for reusibility
+                    const options = {
+                        httpOnly : true, // only manipulated by server not by cliet/browser
+                        expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000)
+                    };
+                    statusCode = 200;
+                    resp.status(statusCode).cookie('token', token, options).json({
+                        message : 'You have successfully logged in',
+                        success: true,
+                        token
+                    })
+                }
+            }
+        };
+        if (statusCode != 200){
+            resp.status(statusCode).send(responseData);
+        }
+    }
+    catch (error){
+        console.log('#ERR201. Error occured at login endpoint. Message : ', error.message);
+    };
+});
 
 
 // to start a server we need to use listen 
