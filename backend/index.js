@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const cookies = require('cookie-parser');
+const cors = require('cors');
 
 DBConnection();
 // server creation 
@@ -12,6 +13,7 @@ const app = express();
 // to avoid undefined value even after passing use below two lines
 app.use(express.json());
 app.use(express.urlencoded({extended : true}));
+app.use(cors());
 
 // endpoint handlers 
 // route, handler function (req, resp) 
