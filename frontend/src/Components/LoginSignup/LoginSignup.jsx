@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 
 import { useFormik } from "formik";
+import axios from "axios";
 
 import "./LoginSignup.css";
 import { basicSchema } from "../Validation/Schema";
@@ -17,25 +18,40 @@ const LoginSignup = () => {
   const [action, setAction] = useState("Signup");
 
   const onSubmit = async (values, actions) => {
-    let payload = {}
+    let payload = {};
+    let endpoint = "";
     if (action == "Signup"){
       let nameArray = values['fullname'].split(" ");
-      const lastname = nameArray.pop();
+      let lastname = " ";
+      if (nameArray.length > 2){
+        lastname = nameArray.pop();
+      }
+      else{
+        lastname = " ";
+      }
       const firstname = nameArray.join(" ");
       payload = {
         ...values,
         firstname,
         lastname
       }
-      console.log(payload);
+      endpoint = "/register";
     }
     else if(action == "Login"){
       payload = values;
+      endpoint = "/login";
     }
     else{
       console.log("Not a valid action");
     }
     console.log(payload);
+    
+    const resp = await axios.post(
+      baseURL + endpoint,
+      payload
+    );
+    console.log(resp);
+
     await new Promise((resolve) => setTimeout(resolve, 1000));
     actions.resetForm();  
   };
